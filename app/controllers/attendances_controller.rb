@@ -3,6 +3,7 @@ class AttendancesController < ApplicationController
   before_action :logged_in_user, only: [:update, :edit_one_month]
   before_action :admin_or_correct_user, only: [:update, :edit_one_month, :update_one_month]
   before_action :set_one_month, only: :edit_one_month
+
   
   UPDATE_ERROR_MSG = "勤怠登録に失敗しました。やり直してください。"
   
@@ -18,7 +19,7 @@ class AttendancesController < ApplicationController
       end
     elsif @attendance.finished_at.nil?
       if @attendance.update_attributes(finished_at: Time.current.change(sec: 0))
-        flash[:info] = "お疲れ様でした。"
+        flash[:warning] = "お疲れ様でした。"
       else
         flash[:danger] = UPDATE_ERROR_MSG
       end
@@ -30,19 +31,27 @@ class AttendancesController < ApplicationController
   end
   
   def update_one_month
-    ActiveRecord::Base.transaction do # トランザクションを開始します。
+    ActiveRecord::Base.transaction do # トランザクション（例外処理）を開始します。
       attendances_params.each do |id, item|
         attendance = Attendance.find(id)
-        attendance.update_attributes!(item)
-        attendance.attributes = item
-        attendance.save!(context: :attendance_update)
+        #attendance.update_attributes!(item) #(context: :invalid_finished_at)
+        #attendance.attributes = item
+        if item[:started_at].present? && item[:finished_at].blank?
+          flash[:danger] = "無効な入力データがあった為、更新をキャンセルしました。"
+          redirect_to attendances_edit_one_month_user_url(date: params[:date]) and return
+        end
+        #attendance.started_at = item[:started_at]
+        #attendance.finished_at = item[:finished_at]
+        #attendance.note = item[:note]
+        attendance.update!(item)
+        
       end
     end
     flash[:success] = "1ヶ月分の勤怠情報を更新しました。"
     redirect_to user_url(date: params[:date])
   rescue ActiveRecord::RecordInvalid # トランザクションによるエラーの分岐です。
     flash[:danger] = "無効な入力データがあった為、更新をキャンセルしました。"
-    redirect_to attendances_edit_one_month_user_url(date: params[:date])
+    redirect_to attendances_edit_one_month_user_url(date: params[:date]) and return
   end
   
   private

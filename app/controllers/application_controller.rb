@@ -24,6 +24,13 @@ class ApplicationController < ActionController::Base
   def correct_user
     redirect_to(root_url) unless current_user?(@user)
   end
+
+  def limitation_login_user
+    if @current_user
+      flash[:notice] = "すでにログイン状態です。"
+      redirect_to posts_index_url
+    end
+  end
   
   # システム管理権限所有かどうか判定します。
   def admin_user
